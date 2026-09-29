@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Placement Inference Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-purple: #9d00ff;
+            --dark-bg: #050505;
+            --glass-bg: rgba(15, 15, 20, 0.4);
+            --glass-border: rgba(0, 243, 255, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--dark-bg);
+            color: #e2e8f0;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* --- Animated Cyberpunk Background --- */
+        .bg-mesh {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; overflow: hidden;
+            background: radial-gradient(circle at 15% 50%, rgba(0, 243, 255, 0.08), transparent 25%),
+                        radial-gradient(circle at 85% 30%, rgba(157, 0, 255, 0.08), transparent 25%);
+        }
+        .orb {
+            position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.5;
+            animation: float 20s infinite ease-in-out alternate;
+        }
+        .orb-1 { width: 400px; height: 400px; background: var(--neon-blue); top: -10%; left: -10%; }
+        .orb-2 { width: 300px; height: 300px; background: var(--neon-purple); bottom: -10%; right: -5%; animation-delay: -5s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(100px, 50px) scale(1.2); }
+        }
+
+        /* --- Glassmorphism Core --- */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* --- Neon Typography & Accents --- */
+        .glow-text {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.6), 0 0 20px rgba(0, 243, 255, 0.4);
+        }
+        .glow-text-purple {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(157, 0, 255, 0.6), 0 0 20px rgba(157, 0, 255, 0.4);
+        }
+
+        /* --- 3D Tilt Cards --- */
+        .tilt-card {
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+        .tilt-card:hover {
+            border-color: rgba(0, 243, 255, 0.5);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+        }
+        .tilt-content { transform: translateZ(30px); }
+
+        /* --- Custom Inputs (Updated for higher visibility/transparency) --- */
+        .cyber-input {
+            background: rgba(255, 255, 255, 0.05); /* Lighter, transparent background */
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(0, 243, 255, 0.3); /* Resting neon border */
+            color: #ffffff; /* Brighter text input */
+            transition: all 0.3s;
+        }
+        .cyber-input:focus {
+            outline: none;
+            background: rgba(0, 243, 255, 0.1);
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+        }
+
+        /* --- Cyber Button --- */
+        .cyber-btn {
+            background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
+            border: none;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        .cyber-btn::before {
+            content: ''; position: absolute; top: 1px; left: 1px; right: 1px; bottom: 1px;
+            background: #050505; border-radius: 999px; z-index: -1; transition: all 0.3s;
+        }
+        .cyber-btn:hover::before { opacity: 0; }
+        .cyber-btn:hover { box-shadow: 0 0 20px rgba(0, 243, 255, 0.4); color: #fff; }
+
+        /* --- SPA Transitions --- */
+        .view-section { display: none; opacity: 0; transition: opacity 0.4s ease; }
+        .view-section.active { display: block; opacity: 1; }
+
+        /* --- Complex Loader --- */
+        .loader-ring {
+            width: 60px; height: 60px; border-radius: 50%;
+            border: 3px solid transparent; border-top-color: var(--neon-blue); border-right-color: var(--neon-purple);
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="bg-mesh">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <nav class="fixed w-full top-0 z-50 glass-panel border-x-0 border-t-0 rounded-none bg-opacity-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="text-xl font-bold mono glow-text cursor-pointer" onclick="switchView('home')">
+                <span class="text-white">SYS.</span>PREDICT
+            </div>
+            <div class="space-x-8 text-sm font-medium tracking-wider uppercase">
+                <button onclick="switchView('home')" class="hover:text-cyan-400 transition-colors">Architecture</button>
+                <button onclick="switchView('predict')" class="hover:text-cyan-400 transition-colors text-cyan-400">Initialize</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="pt-24 pb-12 px-6 flex-grow flex items-center justify-center min-h-screen">
+
+        <section id="home" class="view-section active w-full max-w-7xl">
+            <div class="text-center mb-16 mt-10">
+                <div class="mono text-cyan-400 mb-4 tracking-widest text-sm">PROPRIETARY ML PIPELINE</div>
+                <h1 class="text-5xl md:text-7xl font-bold mb-6 tracking-tight">Placement <span class="glow-text">Inference Engine</span></h1>
+                <p class="text-slate-400 max-w-2xl mx-auto text-lg">A production-ready ensemble of Deep Learning and robust Classical algorithms engineered to compute placement probabilities from multivariate academic vectors.</p>
+
+                <div class="mt-10 flex justify-center gap-6">
+                    <button onclick="switchView('predict')" class="cyber-btn text-cyan-400 font-bold py-3 px-8 rounded-full uppercase tracking-widest text-sm">
+                        Execute Inference
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8 pb-10" id="tilt-grid">
+                <div class="glass-panel p-8 tilt-card">
+                    <div class="tilt-content">
+                        <div class="text-cyan-400 mono text-xs mb-2">01 // TENSOR PROCESSING</div>
+                        <h3 class="text-2xl font-bold text-white mb-3">PyTorch Neural Net</h3>
+                        <p class="text-slate-400 text-sm">Multi-layer perceptron utilizing non-linear ReLU activations and Sigmoid classification to map complex student data patterns.</p>
+                    </div>
+                </div>
+                <div class="glass-panel p-8 tilt-card">
+                    <div class="tilt-content">
+                        <div class="text-purple-400 mono text-xs mb-2">02 // ENSEMBLE METHODS</div>
+                        <h3 class="text-2xl font-bold text-white mb-3">Tree Aggregation</h3>
+                        <p class="text-slate-400 text-sm">Random Forest and Gradient Boosting architectures integrated to prevent overfitting and ensure highly robust predictive variances.</p>
+                    </div>
+                </div>
+                <div class="glass-panel p-8 tilt-card">
+                    <div class="tilt-content">
+                        <div class="text-cyan-400 mono text-xs mb-2">03 // DIMENSIONALITY</div>
+                        <h3 class="text-2xl font-bold text-white mb-3">Feature Scaling</h3>
+                        <p class="text-slate-400 text-sm">Automated standardization pipelines via Scikit-Learn to optimize gradient descent and Euclidean distance calculations.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="predict" class="view-section w-full max-w-4xl">
+            <div class="glass-panel p-8 md:p-12 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-cyan-500 rounded-full mix-blend-overlay filter blur-[80px] opacity-20"></div>
+
+                <div class="border-b border-white/10 pb-6 mb-8 flex justify-between items-end">
+                    <div>
+                        <h2 class="text-3xl font-bold text-white mb-1">Input Parameters</h2>
+                        <p class="text-slate-400 text-sm mono">Define the candidate feature vector.</p>
+                    </div>
+                    <div class="text-cyan-400 mono text-xs border border-cyan-500/50 px-3 py-1 rounded bg-cyan-500/20">STATUS: READY</div>
+                </div>
+
+                <form id="predForm" class="relative z-10">
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+                        <div><label class="block mono text-xs text-slate-300 mb-2">SEM_01_GRADE</label><input type="number" step="0.01" id="sem1" class="cyber-input w-full rounded-lg p-3 mono text-sm" value="75.0" required></div>
+                        <div><label class="block mono text-xs text-slate-300 mb-2">SEM_02_GRADE</label><input type="number" step="0.01" id="sem2" class="cyber-input w-full rounded-lg p-3 mono text-sm" value="76.0" required></div>
+                        <div><label class="block mono text-xs text-slate-300 mb-2">SEM_03_GRADE</label><input type="number" step="0.01" id="sem3" class="cyber-input w-full rounded-lg p-3 mono text-sm" value="72.5" required></div>
+                        <div><label class="block mono text-xs text-slate-300 mb-2">SEM_04_GRADE</label><input type="number" step="0.01" id="sem4" class="cyber-input w-full rounded-lg p-3 mono text-sm" value="79.0" required></div>
+                        <div><label class="block mono text-xs text-slate-300 mb-2">SEM_05_GRADE</label><input type="number" step="0.01" id="sem5" class="cyber-input w-full rounded-lg p-3 mono text-sm" value="81.0" required></div>
+                        <div><label class="block mono text-xs text-slate-300 mb-2">SEM_06_GRADE</label><input type="number" step="0.01" id="sem6" class="cyber-input w-full rounded-lg p-3 mono text-sm" value="83.5" required></div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 bg-black/30 p-6 rounded-xl border border-white/10">
+                        <div><label class="block mono text-xs text-slate-300 mb-2">DSA_METRIC (0-100)</label><input type="number" step="0.1" id="dsa" class="cyber-input w-full rounded-lg p-3 mono text-sm" value="65.0" required></div>
+                        <div><label class="block mono text-xs text-slate-300 mb-2">COMM_RATING (1-10)</label><input type="number" step="0.1" id="comm" class="cyber-input w-full rounded-lg p-3 mono text-sm" value="7.5" required></div>
+                    </div>
+
+                    <div class="mb-10">
+                        <label class="block mono text-xs text-cyan-400 mb-2">SELECT_MODEL_ARCHITECTURE</label>
+                        <select id="modelSelect" class="cyber-input w-full rounded-lg p-4 font-bold text-white appearance-none cursor-pointer">
+                            <option value="Neural Network" class="bg-slate-900">PyTorch Deep Neural Network</option>
+                            <option value="Random Forest" class="bg-slate-900">Random Forest Classifier</option>
+                            <option value="Gradient Boosting" class="bg-slate-900">Gradient Boosting Algorithm</option>
+                            <option value="SVM" class="bg-slate-900">Support Vector Machine</option>
+                            <option value="Logistic Regression" class="bg-slate-900">Logistic Regression</option>
+                            <option value="Decision Tree" class="bg-slate-900">Decision Tree</option>
+                            <option value="KNN" class="bg-slate-900">K-Nearest Neighbors</option>
+                            <option value="Naive Bayes" class="bg-slate-900">Naive Bayes</option>
+                        </select>
+                    </div>
+
+                    <div id="loadingState" class="hidden flex-col items-center justify-center py-4">
+                        <div class="loader-ring mb-4"></div>
+                        <div class="mono text-sm text-cyan-400 animate-pulse">COMPUTING TENSORS...</div>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="cyber-btn w-full text-cyan-400 font-bold py-4 rounded-xl tracking-widest uppercase text-sm">
+                        Execute Model Inference
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <section id="result" class="view-section w-full max-w-4xl">
+            <div class="flex justify-between items-center mb-6">
+                <button onclick="switchView('predict')" class="mono text-xs text-slate-400 hover:text-white transition-colors border border-slate-700 px-4 py-2 rounded">
+                    &lt; RECALCULATE
+                </button>
+                <div class="mono text-xs text-cyan-400 border border-cyan-500/50 px-3 py-1 rounded bg-cyan-500/20">INFERENCE COMPLETE</div>
+            </div>
+
+            <div class="glass-panel p-8 md:p-12">
+                <div class="text-center mb-12">
+                    <h3 class="text-sm mono text-slate-400 mb-2">OUTPUT VECTOR</h3>
+                    <h2 class="text-4xl md:text-5xl font-bold text-white">Probability: <span id="repProb" class="glow-text">--%</span></h2>
+                </div>
+
+                <div id="resultBanner" class="p-6 rounded-xl border border-white/10 bg-black/40 text-center mb-10">
+                    <h3 id="repStatus" class="text-2xl font-bold mb-2 uppercase tracking-wide">--</h3>
+                    <p class="text-slate-400 text-sm mono">Classification resolved via <span id="repModel" class="text-white font-bold">--</span></p>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mono text-sm">
+                    <div class="border border-white/10 bg-white/10 p-4 rounded-lg">
+                        <div class="text-cyan-300 text-xs mb-1">AGGREGATE_SEM</div>
+                        <div id="repAvg" class="text-white text-lg">--%</div>
+                    </div>
+                    <div class="border border-white/10 bg-white/10 p-4 rounded-lg">
+                        <div class="text-cyan-300 text-xs mb-1">DSA_METRIC</div>
+                        <div id="repDsa" class="text-white text-lg">--</div>
+                    </div>
+                    <div class="border border-white/10 bg-white/10 p-4 rounded-lg">
+                        <div class="text-cyan-300 text-xs mb-1">COMM_METRIC</div>
+                        <div id="repComm" class="text-white text-lg">--/10</div>
+                    </div>
+                    <div class="border border-white/10 bg-white/10 p-4 rounded-lg">
+                        <div class="text-cyan-300 text-xs mb-1">RUNTIME_ENGINE</div>
+                        <div id="repAlg" class="text-white text-lg truncate">--</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        function switchView(viewId) {
+            document.querySelectorAll('.view-section').forEach(el => {
+                el.classList.remove('active');
+            });
+            setTimeout(() => {
+                document.getElementById(viewId).classList.add('active');
+                window.scrollTo(0,0);
+            }, 50);
+        }
+
+        const cards = document.querySelectorAll('.tilt-card');
+        cards.forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const rotateX = ((y - centerY) / centerY) * -10;
+                const rotateY = ((x - centerX) / centerX) * 10;
+
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+            });
+        });
+
+        document.getElementById('predForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const btn = document.getElementById('submitBtn');
+            const loader = document.getElementById('loadingState');
+
+            btn.classList.add('hidden');
+            loader.classList.remove('hidden');
+            loader.classList.add('flex');
+
+            const payload = {
+                sem1: document.getElementById('sem1').value,
+                sem2: document.getElementById('sem2').value,
+                sem3: document.getElementById('sem3').value,
+                sem4: document.getElementById('sem4').value,
+                sem5: document.getElementById('sem5').value,
+                sem6: document.getElementById('sem6').value,
+                dsa_score: document.getElementById('dsa').value,
+                comm_skills: document.getElementById('comm').value,
+                model_type: document.getElementById('modelSelect').value
+            };
+
+            try {
+                const response = await fetch('/api/predict', { method: 'POST', body: JSON.stringify(payload) });
+                const result = await response.json();
+
+                if (result.success) {
+                    const avg = ((parseFloat(payload.sem1)+parseFloat(payload.sem2)+parseFloat(payload.sem3)+parseFloat(payload.sem4)+parseFloat(payload.sem5)+parseFloat(payload.sem6))/6).toFixed(1);
+                    document.getElementById('repAvg').innerText = `${avg}%`;
+                    document.getElementById('repDsa').innerText = payload.dsa_score;
+                    document.getElementById('repComm').innerText = `${payload.comm_skills}/10`;
+
+                    const shortModel = result.model_used === 'Neural Network' ? 'PyTorch' : 'SciKit';
+                    document.getElementById('repAlg').innerText = shortModel;
+                    document.getElementById('repModel').innerText = result.model_used;
+
+                    document.getElementById('repProb').innerText = `${result.probability.toFixed(2)}%`;
+
+                    const banner = document.getElementById('resultBanner');
+                    const statusText = document.getElementById('repStatus');
+                    statusText.innerText = result.status;
+
+                    if (result.probability >= 50) {
+                        statusText.className = 'text-2xl font-bold mb-2 uppercase tracking-wide glow-text';
+                        banner.style.borderColor = 'rgba(0, 243, 255, 0.4)';
+                    } else {
+                        statusText.className = 'text-2xl font-bold mb-2 uppercase tracking-wide glow-text-purple';
+                        banner.style.borderColor = 'rgba(157, 0, 255, 0.4)';
+                        document.getElementById('repProb').className = 'glow-text-purple';
+                    }
+
+                    setTimeout(() => {
+                        switchView('result');
+                        btn.classList.remove('hidden');
+                        loader.classList.add('hidden');
+                        loader.classList.remove('flex');
+                    }, 800);
+
+                } else {
+                    alert('Inference Error: ' + result.error);
+                    btn.classList.remove('hidden');
+                    loader.classList.add('hidden');
+                    loader.classList.remove('flex');
+                }
+            } catch (err) {
+                alert('Connection to inference engine failed.');
+                btn.classList.remove('hidden');
+                loader.classList.add('hidden');
+                loader.classList.remove('flex');
+            }
+        });
+    </script>
+</body>
+</html>

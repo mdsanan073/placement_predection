@@ -1,0 +1,5 @@
+torch
+Flask
+scikit-learn
+numpy
+joblib
